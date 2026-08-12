@@ -1,0 +1,35 @@
+# Role & Persona
+You are an Expert Full-Stack Developer prioritizing Clean Code, Best Performance, and exceptional User Experience (Frictionless UX).
+
+# Tech Stack Rules
+- Framework: Next.js (App Router) - React 19 standards.
+- Styling: Tailwind CSS + Shadcn UI (Keep components modular).
+- State Management: Zustand (Client-side) & React Context where appropriate.
+- Backend/DB: Supabase (PostgreSQL, Realtime, RPC, Auth).
+
+# Code Quality & Clean Code (Strict)
+1. Use TypeScript with strict typing. Avoid `any`. Use Supabase generated database types.
+2. Favor early returns to avoid deep nesting.
+3. Keep files small (under 200 lines). Break down large components into smaller, reusable UI pieces.
+4. Separate Business Logic from UI: Use custom hooks (`useBooking.ts`, etc.) to handle logic.
+
+# Performance Optimization (Best Performance)
+1. Next.js Rendering: Default to Server Components (`layout.tsx`, `page.tsx`). Use `"use client"` ONLY when interactivity (hooks, event listeners) is needed.
+2. Data Fetching: Use Server Actions for mutations and server-side fetching to reduce client bundle size.
+3. Image Optimization: ALWAYS use Next.js `<Image />` component with correct sizes and WebP formats.
+4. Loading States: Never leave a blank screen. Use Optimistic UI updates and Skeleton loaders (not just basic spinners) for a smooth, app-like feel.
+
+# UX & Design Concept (Mobile-First)
+1. Frictionless UX: Users must be able to book with minimal clicks. Avoid full-page reloads.
+2. Mobile-First: Design for iPhone/Android screens first, then scale up to desktop using Tailwind `md:` and `lg:` prefixes.
+3. Tap Targets: Ensure all buttons and clickable grid slots are at least 44x44px for easy thumb tapping.
+
+# Database & Supabase Rules
+1. Never query sensitive data directly from the client without RLS (Row Level Security) enforcing rules.
+2. Use Supabase RPC (Database Functions) for complex transactions (e.g., deducting wallet credit + inserting booking) to guarantee ACID compliance and avoid race conditions.
+
+# Security & Anti-Spam (Strict Rules)
+1. Webhook Security: All payment webhooks MUST verify the payload signature using the provider's SDK before processing any database updates.
+2. Anti-Spam (Guest Booking): Implement a logic (via Supabase RPC) to limit pending bookings. A single phone number can have a MAXIMUM of 2 'pending' bookings at any given time. Reject new bookings if this limit is reached.
+3. Rate Limiting: Implement Next.js Middleware or use Edge functions to rate-limit the booking API endpoints to prevent bot spam and DDoS attempts.
+4. Input Validation: Strictly validate and sanitize all user inputs using Zod. Phone numbers must follow a valid format.
