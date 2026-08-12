@@ -258,37 +258,36 @@ export interface Database {
         };
         Returns: string;
       };
-      // anon/authenticated only. Read-only "is this still payable?" check -
-      // see supabase/migrations/20260812000000_stripe_payment_rpcs.sql.
+      // anon/authenticated only. Read-only "is this whole batch still
+      // payable?" check (all pending, all same customer) - see
+      // supabase/migrations/20260813000000_batch_payment_rpcs.sql.
       create_payment_intent: {
         Args: {
-          p_booking_id: string;
+          p_booking_ids: string[];
         };
         Returns: {
           total_price: number;
-          court_name: string;
-          start_time: string;
-          end_time: string;
+          description: string;
         }[];
       };
       // service_role only - never callable from anon/authenticated clients.
       confirm_booking_payment: {
         Args: {
-          p_booking_id: string;
+          p_booking_ids: string[];
           p_payment_intent_id: string;
           p_provider_reference: string;
         };
         Returns: {
-          booking_id: string;
+          booking_ids: string[];
           customer_id: string;
-          amount: number;
+          total_amount: number;
         }[];
       };
-      // anon/authenticated only. Powers the dedicated /booking/payment/[id]
-      // page - see supabase/migrations/20260812020000_get_booking_for_payment.sql.
-      get_booking_for_payment: {
+      // anon/authenticated only. Powers the /booking/payment page (batch) -
+      // see supabase/migrations/20260813000000_batch_payment_rpcs.sql.
+      get_bookings_for_payment: {
         Args: {
-          p_booking_id: string;
+          p_booking_ids: string[];
         };
         Returns: {
           booking_id: string;
@@ -300,6 +299,16 @@ export interface Database {
           court_name: string;
           customer_full_name: string;
           customer_phone: string;
+        }[];
+      };
+      // anon/authenticated only. Guest manual cancel on the payment page -
+      // see supabase/migrations/20260813020000_cancel_pending_bookings.sql.
+      cancel_pending_bookings: {
+        Args: {
+          p_booking_ids: string[];
+        };
+        Returns: {
+          cancelled_count: number;
         }[];
       };
     };

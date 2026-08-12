@@ -6,6 +6,7 @@ import {
   useElements,
   useStripe,
 } from "@stripe/react-stripe-js";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/format";
 
@@ -100,9 +101,10 @@ export function PaymentForm({
 
       <Button
         type="submit"
-        className="h-11 w-full"
+        className="h-11 w-full gap-2"
         disabled={!stripe || !elementReady || isConfirming}
       >
+        {isConfirming && <Loader2 className="size-4 animate-spin" />}
         {isConfirming ? "Waiting for payment…" : `Pay ${formatCurrency(amount)}`}
       </Button>
     </form>

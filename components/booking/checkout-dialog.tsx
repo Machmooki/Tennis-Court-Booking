@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +22,12 @@ import { formatCurrency, formatTime } from "@/lib/format";
 
 /**
  * Collects guest name/phone, creates the pending booking(s) via
- * `process_guest_booking`, then hands off to the dedicated
- * `/booking/payment/[id]` page. This dialog deliberately never touches
- * Stripe or renders payment UI - a prior single-dialog design that swapped
- * in embedded Stripe Elements content here caused persistent Base UI modal
+ * `process_guest_booking`, then hands off to the dedicated `/booking/payment`
+ * page with every successful booking id in the `ids` query param - a
+ * multi-slot checkout pays for all of them together in one PaymentIntent,
+ * not just the first. This dialog deliberately never touches Stripe or
+ * renders payment UI - a prior single-dialog design that swapped in
+ * embedded Stripe Elements content here caused persistent Base UI modal
  * focus/dismiss issues. A full page navigation for payment is far more
  * stable.
  */
@@ -119,22 +122,13 @@ export function CheckoutDialog({
       }
 
       setError(null);
-      const [firstSuccess, ...restSuccesses] = succeeded;
+      const bookingIds = succeeded
+        .map((s) => s.bookingId)
+        .filter((id): id is string => Boolean(id));
 
-      // Payment is a single-booking flow, so only the first successful slot
-      // is paid for right now. Any extra slots stay reserved (pending) and
-      // can be paid for in a follow-up visit.
-      if (restSuccesses.length > 0) {
-        toast.info(
-          `You'll need to pay for ${restSuccesses.length} more slot${
-            restSuccesses.length === 1 ? "" : "s"
-          } separately.`
-        );
-      }
-
-      if (firstSuccess?.bookingId) {
+      if (bookingIds.length > 0) {
         setIsRedirecting(true);
-        router.push(`/booking/payment/${firstSuccess.bookingId}`);
+        router.push(`/booking/payment?ids=${bookingIds.join(",")}`);
       }
     });
   }
@@ -213,8 +207,11 @@ export function CheckoutDialog({
               disabled={
                 isPending || isRedirecting || selectedSlots.length === 0
               }
-              className="h-11 w-full"
+              className="h-11 w-full gap-2"
             >
+              {(isPending || isRedirecting) && (
+                <Loader2 className="size-4 animate-spin" />
+              )}
               {isRedirecting
                 ? "Redirecting to payment…"
                 : isPending

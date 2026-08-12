@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { z } from "zod";
 import { createServiceClient } from "@/lib/supabase/service";
+import { bookingIdsSchema } from "@/lib/booking/schema";
 
 // App Router Route Handlers, unlike the old Pages Router API routes, never
 // auto-parse the request body - `await request.text()` below already
@@ -10,8 +10,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 // the Node runtime just guards against ever accidentally opting into Edge,
 // where Stripe's SDK (and its Node `crypto` dependency) isn't supported.
 export const runtime = "nodejs";
-
-const bookingIdSchema = z.string().uuid();
 
 function getStripeClient(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -62,8 +60,12 @@ export async function POST(request: Request) {
   }
 
   const paymentIntent = event.data.object as Stripe.PaymentIntent;
-  const bookingIdResult = bookingIdSchema.safeParse(
-    paymentIntent.metadata?.booking_id
+  const bookingIdsRaw = paymentIntent.metadata?.booking_ids ?? "";
+  const bookingIdsResult = bookingIdsSchema.safeParse(
+    bookingIdsRaw
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
   );
   const paymentIntentId = paymentIntent.id;
   // The charge id (when available) is a more specific provider reference
@@ -76,17 +78,17 @@ export async function POST(request: Request) {
 
   console.log("[webhook/payment] payment_intent.succeeded metadata:", {
     paymentIntentId,
-    bookingId: paymentIntent.metadata?.booking_id,
+    bookingIds: bookingIdsRaw,
     providerReference,
   });
 
-  if (!bookingIdResult.success) {
+  if (!bookingIdsResult.success) {
     // Malformed event from our own integration (metadata we set ourselves
     // when creating the PaymentIntent) - not something a retry will fix,
     // but log loudly since it means a payment succeeded with no way to
     // match it.
     console.error(
-      "[webhook/payment] payment_intent.succeeded missing/invalid booking_id metadata:",
+      "[webhook/payment] payment_intent.succeeded missing/invalid booking_ids metadata:",
       { paymentIntentId, metadata: paymentIntent.metadata }
     );
     return NextResponse.json({ received: true });
@@ -97,12 +99,12 @@ export async function POST(request: Request) {
   // emails/SMS, etc.) - those should be queued/fired asynchronously
   // elsewhere, never awaited here.
   console.log(
-    `[webhook/payment] calling confirm_booking_payment for booking ${bookingIdResult.data} (service role)`
+    `[webhook/payment] calling confirm_booking_payment for bookings [${bookingIdsResult.data.join(", ")}] (service role)`
   );
   const supabase = createServiceClient();
   const { data, error } = await supabase
     .rpc("confirm_booking_payment", {
-      p_booking_id: bookingIdResult.data,
+      p_booking_ids: bookingIdsResult.data,
       p_payment_intent_id: paymentIntentId,
       p_provider_reference: providerReference,
     })
@@ -130,7 +132,7 @@ export async function POST(request: Request) {
   }
 
   console.info(
-    `[webhook/payment] confirmed booking ${data?.booking_id} via payment intent ${paymentIntentId}.`
+    `[webhook/payment] confirmed bookings [${data?.booking_ids?.join(", ")}] via payment intent ${paymentIntentId}.`
   );
-  return NextResponse.json({ received: true, bookingId: data?.booking_id });
+  return NextResponse.json({ received: true, bookingIds: data?.booking_ids });
 }

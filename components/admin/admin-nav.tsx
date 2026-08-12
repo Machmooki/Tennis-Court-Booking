@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, LayoutGrid, LogOut } from "lucide-react";
+import { useFormStatus } from "react-dom";
+import { CalendarDays, LayoutGrid, Loader2, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
@@ -46,17 +47,33 @@ export function AdminNav({ email }: { email: string | null }) {
             </span>
           )}
           <form action={signOut}>
-            <Button
-              type="submit"
-              variant="outline"
-              className="h-11 w-11"
-              aria-label="Sign out"
-            >
-              <LogOut className="size-4" />
-            </Button>
+            <SignOutButton />
           </form>
         </div>
       </div>
     </header>
+  );
+}
+
+// `useFormStatus` only reports its parent `<form>`'s pending state when
+// called from a component *nested inside* that form, not the component that
+// renders the form itself - hence this small dedicated component.
+function SignOutButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <Button
+      type="submit"
+      variant="outline"
+      className="h-11 w-11"
+      disabled={pending}
+      aria-label="Sign out"
+    >
+      {pending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <LogOut className="size-4" />
+      )}
+    </Button>
   );
 }

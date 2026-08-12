@@ -1,13 +1,8 @@
 "use server";
 
 import Stripe from "stripe";
-import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { formatDateTime } from "@/lib/format";
-
-const paymentIntentSchema = z.object({
-  bookingId: z.string().uuid("Invalid booking reference."),
-});
+import { bookingIdsSchema } from "@/lib/booking/schema";
 
 export interface PaymentIntentData {
   clientSecret: string;
@@ -18,6 +13,10 @@ export interface PaymentIntentData {
 export type CreatePaymentIntentResult =
   | { error: string; data?: undefined }
   | { error?: undefined; data: PaymentIntentData };
+
+export type CancelPendingBookingsResult =
+  | { error: string; cancelledCount?: undefined }
+  | { error?: undefined; cancelledCount: number };
 
 function getStripeClient(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -30,18 +29,18 @@ function getStripeClient(): Stripe {
 }
 
 /**
- * Starts payment for an existing pending booking by creating a Stripe
- * PaymentIntent for PromptPay + card, and returning its `client_secret` so
- * the client can render an embedded `<PaymentElement>` - no redirect to a
- * Stripe-hosted page for PromptPay. Never trusts a client-supplied amount:
- * `create_payment_intent` validates the booking is still pending and returns
- * the real, server-computed `total_price` locked in when the booking was
- * created.
+ * Starts payment for a batch of pending bookings (one checkout can select
+ * multiple slots) by creating a single Stripe PaymentIntent for PromptPay +
+ * card, and returning its `client_secret` so the client can render an
+ * embedded `<PaymentElement>` - no redirect to a Stripe-hosted page for
+ * PromptPay. Never trusts a client-supplied amount: `create_payment_intent`
+ * validates every booking is still pending and belongs to the same
+ * customer, and returns the real, server-computed combined `total_price`.
  */
 export async function createPaymentIntent(
-  bookingId: string
+  bookingIds: string[]
 ): Promise<CreatePaymentIntentResult> {
-  const parsed = paymentIntentSchema.safeParse({ bookingId });
+  const parsed = bookingIdsSchema.safeParse(bookingIds);
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Invalid booking." };
   }
@@ -59,14 +58,14 @@ export async function createPaymentIntent(
   }
 
   const supabase = await createClient();
-  const { data: booking, error } = await supabase
-    .rpc("create_payment_intent", { p_booking_id: parsed.data.bookingId })
+  const { data: batch, error } = await supabase
+    .rpc("create_payment_intent", { p_booking_ids: parsed.data })
     .single();
 
   if (error) {
     return { error: error.message };
   }
-  if (!booking) {
+  if (!batch) {
     return { error: "Booking not found." };
   }
 
@@ -84,7 +83,7 @@ export async function createPaymentIntent(
   // zero-decimal currency in Stripe's accounting (unlike e.g. JPY) - its
   // minor unit is satang, 100 of which make 1 baht - so the same *100
   // conversion used for e.g. USD cents applies here too.
-  const amountSatang = Math.round(booking.total_price * 100);
+  const amountSatang = Math.round(batch.total_price * 100);
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
@@ -92,14 +91,14 @@ export async function createPaymentIntent(
       currency: "thb",
       // PromptPay (QR) + card so `<PaymentElement>` shows both tabs.
       payment_method_types: ["promptpay", "card"],
-      description: `${booking.court_name} court booking, ${formatDateTime(
-        booking.start_time
-      )} – ${formatDateTime(booking.end_time)}`,
-      // Trusted, tamper-proof link back to our booking: the webhook only
+      description: batch.description ?? undefined,
+      // Trusted, tamper-proof link back to our bookings: the webhook only
       // ever reads this out of Stripe's *signed* event payload, never from
-      // client input.
+      // client input. Joined as a string since Stripe metadata values must
+      // be strings (max 500 chars - comfortably fits the 10-booking cap
+      // enforced by `bookingIdsSchema`/`create_payment_intent`).
       metadata: {
-        booking_id: parsed.data.bookingId,
+        booking_ids: parsed.data.join(","),
       },
     });
 
@@ -110,7 +109,7 @@ export async function createPaymentIntent(
     return {
       data: {
         clientSecret: paymentIntent.client_secret,
-        amount: booking.total_price,
+        amount: batch.total_price,
       },
     };
   } catch (stripeError) {
@@ -125,4 +124,32 @@ export async function createPaymentIntent(
           : "Failed to start payment. Please try again.",
     };
   }
+}
+
+/**
+ * Releases still-pending bookings immediately from the payment page so the
+ * guest does not have to wait for the 15-minute auto-cancel cron. Guests
+ * have no direct UPDATE policy on `bookings`, so this goes through the
+ * `cancel_pending_bookings` security-definer RPC (booking ids act as the
+ * capability token, same as `get_bookings_for_payment`). Confirmed/paid
+ * rows are never touched.
+ */
+export async function cancelPendingBookings(
+  bookingIds: string[]
+): Promise<CancelPendingBookingsResult> {
+  const parsed = bookingIdsSchema.safeParse(bookingIds);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid booking." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("cancel_pending_bookings", { p_booking_ids: parsed.data })
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { cancelledCount: data?.cancelled_count ?? 0 };
 }

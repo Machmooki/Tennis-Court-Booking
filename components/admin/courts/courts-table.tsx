@@ -1,7 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
-import { Trash2 } from "lucide-react";
+import { useState, useTransition } from "react";
+import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -32,6 +32,7 @@ import type { CourtRow } from "@/types/database";
 
 export function CourtsTable({ courts }: { courts: CourtRow[] }) {
   const [isPending, startTransition] = useTransition();
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   function handleToggleActive(court: CourtRow, isActive: boolean) {
     startTransition(async () => {
@@ -50,6 +51,7 @@ export function CourtsTable({ courts }: { courts: CourtRow[] }) {
       try {
         await deleteCourt(courtId);
         toast.success("Court deleted.");
+        setDeleteTargetId(null);
       } catch (error) {
         toast.error(
           error instanceof Error ? error.message : "Failed to delete court."
@@ -102,7 +104,12 @@ export function CourtsTable({ courts }: { courts: CourtRow[] }) {
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
                   <CourtFormDialog mode="edit" court={court} />
-                  <AlertDialog>
+                  <AlertDialog
+                    open={deleteTargetId === court.id}
+                    onOpenChange={(open) =>
+                      setDeleteTargetId(open ? court.id : null)
+                    }
+                  >
                     <AlertDialogTrigger
                       render={
                         <Button
@@ -126,11 +133,18 @@ export function CourtsTable({ courts }: { courts: CourtRow[] }) {
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isPending}>
+                          Cancel
+                        </AlertDialogCancel>
                         <AlertDialogAction
+                          disabled={isPending}
+                          className="gap-2"
                           onClick={() => handleDelete(court.id)}
                         >
-                          Delete
+                          {isPending && (
+                            <Loader2 className="size-4 animate-spin" />
+                          )}
+                          {isPending ? "Deleting…" : "Delete"}
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>

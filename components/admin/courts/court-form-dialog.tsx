@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, type FormEvent } from "react";
-import { Pencil, Plus } from "lucide-react";
+import { Loader2, Pencil, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +149,8 @@ export function CourtFormDialog(props: CourtFormDialogProps) {
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={isPending} className="h-11">
+            <Button type="submit" disabled={isPending} className="h-11 gap-2">
+              {isPending && <Loader2 className="size-4 animate-spin" />}
               {isPending
                 ? "Saving…"
                 : mode === "create"

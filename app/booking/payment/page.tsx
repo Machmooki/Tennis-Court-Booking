@@ -1,54 +1,72 @@
 import Link from "next/link";
-import { z } from "zod";
 import { CircleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { PaymentPageClient } from "@/components/booking/payment-page-client";
+import { bookingIdsSchema } from "@/lib/booking/schema";
 import type { BookingStatus } from "@/types/database";
 
-const bookingIdSchema = z.string().uuid();
-
 export default async function BookingPaymentPage({
-  params,
+  searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  searchParams: Promise<{ ids?: string }>;
 }) {
-  const { id } = await params;
-  const parsedId = bookingIdSchema.safeParse(id);
+  const { ids } = await searchParams;
+  const requestedIds = (ids ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
 
-  if (!parsedId.success) {
+  const parsedIds = bookingIdsSchema.safeParse(requestedIds);
+  if (!parsedIds.success) {
     return <StatusMessage title="Booking not found." />;
   }
 
   const supabase = await createClient();
-  const { data: booking, error } = await supabase
-    .rpc("get_booking_for_payment", { p_booking_id: parsedId.data })
-    .single();
+  const { data: bookings, error } = await supabase.rpc(
+    "get_bookings_for_payment",
+    { p_booking_ids: parsedIds.data }
+  );
 
-  if (error || !booking) {
+  if (error) {
     return (
-      <StatusMessage
-        variant="error"
-        title={bookingLookupErrorMessage(error)}
-      />
+      <StatusMessage variant="error" title={bookingLookupErrorMessage(error)} />
     );
   }
 
-  if (booking.status !== "pending") {
-    return <StatusMessage title={statusMessage(booking.status)} />;
+  // Some requested ids didn't resolve to a real booking (typo'd/tampered
+  // URL, or a booking that no longer exists) - treat the whole batch as
+  // unpayable rather than silently charging for a subset.
+  if (!bookings || bookings.length !== parsedIds.data.length) {
+    return <StatusMessage title="We couldn't find that booking." />;
   }
+
+  const notPending = bookings.find((b) => b.status !== "pending");
+  if (notPending) {
+    return <StatusMessage title={statusMessage(notPending.status)} />;
+  }
+
+  const first = bookings[0];
 
   return (
     <PaymentPageClient
-      booking={{
-        id: parsedId.data,
-        totalPrice: booking.total_price,
-        courtName: booking.court_name,
-        startIso: booking.start_time,
-        endIso: booking.end_time,
-        createdAtIso: booking.created_at,
-        customerFullName: booking.customer_full_name,
-        customerPhone: booking.customer_phone,
+      data={{
+        bookings: bookings.map((b) => ({
+          id: b.booking_id,
+          courtName: b.court_name,
+          startIso: b.start_time,
+          endIso: b.end_time,
+          totalPrice: b.total_price,
+        })),
+        customerFullName: first.customer_full_name,
+        customerPhone: first.customer_phone,
+        // The earliest-created booking in the batch is the first the
+        // auto-cancel cron will expire, so it's the correct countdown
+        // deadline for the whole payment.
+        createdAtIso: bookings.reduce(
+          (earliest, b) => (b.created_at < earliest ? b.created_at : earliest),
+          first.created_at
+        ),
       }}
     />
   );
@@ -65,11 +83,6 @@ function bookingLookupErrorMessage(
   error: { code?: string; message?: string } | null
 ): string {
   if (!error) {
-    return "We couldn't find that booking.";
-  }
-
-  // PostgREST `.single()` when the RPC returns zero rows.
-  if (error.code === "PGRST116") {
     return "We couldn't find that booking.";
   }
 
