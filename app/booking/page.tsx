@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { isValidIsoDate, todayIsoDate } from "@/lib/date";
+import { getDayRangeUTC, isValidIsoDate, todayIsoDate } from "@/lib/date";
 import { BookingDateNav } from "@/components/booking/date-nav";
 import { SlotGrid } from "@/components/booking/slot-grid";
 import { CheckoutBar } from "@/components/booking/checkout-bar";
+import { slotKey } from "@/lib/booking/slots";
+import type { BookingStatus } from "@/types/database";
 
 export default async function BookingPage({
   searchParams,
@@ -14,14 +16,41 @@ export default async function BookingPage({
     dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoDate();
 
   const supabase = await createClient();
-  const { data: courts, error } = await supabase
-    .from("courts")
-    .select("id, name, peak_price, off_peak_price, is_active, created_at, updated_at")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
+  const range = getDayRangeUTC(date);
 
-  if (error) {
-    throw new Error(`Failed to load courts: ${error.message}`);
+  // Parallel fetch: courts + occupancy for the selected day so the grid is
+  // painted on first paint instead of waiting for a client-side waterfall.
+  const [courtsResult, availabilityResult] = await Promise.all([
+    supabase
+      .from("courts")
+      .select(
+        "id, name, peak_price, off_peak_price, is_active, created_at, updated_at"
+      )
+      .eq("is_active", true)
+      .order("name", { ascending: true }),
+    supabase
+      .from("court_availability")
+      .select("court_id, start_time, status")
+      .gte("start_time", range.startIso)
+      .lt("start_time", range.endIso),
+  ]);
+
+  if (courtsResult.error) {
+    throw new Error(`Failed to load courts: ${courtsResult.error.message}`);
+  }
+
+  // Plain object (not Map) so it can cross the RSC → client boundary.
+  const initialAvailability: Record<string, BookingStatus> = {};
+  if (availabilityResult.error) {
+    console.error(
+      "[booking] failed to prefetch availability:",
+      availabilityResult.error.message
+    );
+  } else {
+    for (const row of availabilityResult.data ?? []) {
+      initialAvailability[slotKey(row.court_id, row.start_time)] =
+        row.status as BookingStatus;
+    }
   }
 
   return (
@@ -39,7 +68,11 @@ export default async function BookingPage({
 
         <BookingDateNav date={date} />
 
-        <SlotGrid date={date} courts={courts ?? []} />
+        <SlotGrid
+          date={date}
+          courts={courtsResult.data ?? []}
+          initialAvailability={initialAvailability}
+        />
 
         <Legend />
       </div>

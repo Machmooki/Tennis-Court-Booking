@@ -6,17 +6,21 @@ import { useAvailability } from "@/lib/booking/use-availability";
 import { useBookingStore } from "@/lib/booking/store";
 import { getDaySlots, isSlotInPast, slotKey } from "@/lib/booking/slots";
 import { getSlotPrice } from "@/lib/booking/pricing";
-import type { CourtRow } from "@/types/database";
+import type { BookingStatus, CourtRow } from "@/types/database";
 
 export function SlotGrid({
   date,
   courts,
+  initialAvailability,
 }: {
   date: string;
   courts: CourtRow[];
+  initialAvailability?: Record<string, BookingStatus>;
 }) {
-  const { availability, isLoading, isRealtimeConnected } =
-    useAvailability(date);
+  const { availability, isLoading, isRealtimeConnected } = useAvailability(
+    date,
+    initialAvailability
+  );
   const selectedSlots = useBookingStore((s) => s.selectedSlots);
   const toggleSlot = useBookingStore((s) => s.toggleSlot);
 

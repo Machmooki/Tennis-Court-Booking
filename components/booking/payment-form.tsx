@@ -17,7 +17,7 @@ export function PaymentForm({
 }: {
   amount: number;
   customerName?: string;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -51,7 +51,7 @@ export function PaymentForm({
     }
 
     if (paymentIntent?.status === "succeeded") {
-      onSuccess();
+      onSuccess(paymentIntent.id);
       return;
     }
 
@@ -70,6 +70,16 @@ export function PaymentForm({
             },
             // PromptPay first (primary for THB guests), then card.
             paymentMethodOrder: ["promptpay", "card"],
+            // Collect email when Stripe requires it (always for PromptPay).
+            // The webhook reads this from the PaymentIntent / Charge to send
+            // the E-Ticket. Stripe's typed API only allows 'auto' | 'never'
+            // for email (unlike name, which supports 'always').
+            fields: {
+              billingDetails: {
+                email: "auto",
+                name: "auto",
+              },
+            },
             defaultValues: customerName
               ? {
                   billingDetails: {

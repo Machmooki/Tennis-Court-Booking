@@ -1,4 +1,5 @@
-// Hand-written to match `supabase/migrations/20260810154328_initial_schema.sql`.
+// Hand-written to match the SQL migrations under `supabase/migrations/`,
+// most recently `20260813100000_admin_analytics_cash_flow.sql`.
 // Once the project is linked, replace with:
 //   supabase gen types typescript --linked > types/database.ts
 //
@@ -10,13 +11,44 @@
 // the whole table to `never`. The exported `*Row` types below are for the
 // app to import; they are NOT reused inside `Database` for that reason.
 
-export type BookingStatus = "pending" | "confirmed" | "cancelled";
+// 'blocked' (Phase 6.2) marks a slot an admin has taken offline (maintenance,
+// private event, etc.) - it is not a real customer booking but still holds
+// the slot via the same overlap-prevention exclusion constraint.
+export type BookingStatus = "pending" | "confirmed" | "cancelled" | "blocked";
 export type TransactionType =
   | "payment"
   | "refund"
   | "credit_topup"
   | "credit_deduction";
 export type TransactionStatus = "pending" | "completed" | "failed";
+export type WalletTransactionType = "topup" | "usage" | "admin_adjustment";
+export type PackageUsableAt = "all_times" | "off_peak";
+
+// Return shape of the `get_admin_analytics()` RPC (Phase 6.3) - a single
+// jsonb object, not a row set, so it's typed separately from the `*Row`
+// table types above/below.
+export interface CourtBookingAnalytics {
+  court_id: string;
+  court_name: string;
+  /** Confirmed bookings for this court, current calendar month only. */
+  bookings_count: number;
+  /** Nominal booking value (not real cash - see `AdminAnalytics.total_revenue`). */
+  revenue: number;
+}
+
+export interface AdminAnalytics {
+  /**
+   * Actual cash received this month: SUM of completed `payment`
+   * `transactions` (Stripe/PromptPay), NOT `bookings.total_price` - a
+   * wallet-paid booking has a nominal price but no new cash that month.
+   */
+  total_revenue: number;
+  /** Confirmed bookings created this calendar month. */
+  total_bookings: number;
+  /** All-time count of customers with a linked auth account. */
+  total_members: number;
+  bookings_by_court: CourtBookingAnalytics[];
+}
 
 export interface CourtRow {
   id: string;
@@ -34,8 +66,31 @@ export interface CustomerRow {
   full_name: string;
   auth_user_id: string | null;
   credit_balance: number;
+  wallet_hours_all_time: number;
+  wallet_hours_off_peak: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface PackageRow {
+  id: string;
+  name: string;
+  price_thb: number;
+  credit_hours: number;
+  usable_at: PackageUsableAt;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WalletTransactionRow {
+  id: string;
+  customer_id: string;
+  package_id: string | null;
+  type: WalletTransactionType;
+  hours_amount: number;
+  note: string | null;
+  created_at: string;
 }
 
 export interface BookingRow {
@@ -47,6 +102,7 @@ export interface BookingRow {
   total_price: number;
   status: BookingStatus;
   payment_intent_id: string | null;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -111,6 +167,8 @@ export interface Database {
           full_name: string;
           auth_user_id: string | null;
           credit_balance: number;
+          wallet_hours_all_time: number;
+          wallet_hours_off_peak: number;
           created_at: string;
           updated_at: string;
         };
@@ -120,6 +178,8 @@ export interface Database {
           full_name: string;
           auth_user_id?: string | null;
           credit_balance?: number;
+          wallet_hours_all_time?: number;
+          wallet_hours_off_peak?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -129,10 +189,90 @@ export interface Database {
           full_name?: string;
           auth_user_id?: string | null;
           credit_balance?: number;
+          wallet_hours_all_time?: number;
+          wallet_hours_off_peak?: number;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
+      };
+      packages: {
+        Row: {
+          id: string;
+          name: string;
+          price_thb: number;
+          credit_hours: number;
+          usable_at: PackageUsableAt;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          price_thb: number;
+          credit_hours: number;
+          usable_at?: PackageUsableAt;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          price_thb?: number;
+          credit_hours?: number;
+          usable_at?: PackageUsableAt;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      wallet_transactions: {
+        Row: {
+          id: string;
+          customer_id: string;
+          package_id: string | null;
+          type: WalletTransactionType;
+          hours_amount: number;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          package_id?: string | null;
+          type: WalletTransactionType;
+          hours_amount: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          customer_id?: string;
+          package_id?: string | null;
+          type?: WalletTransactionType;
+          hours_amount?: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "wallet_transactions_customer_id_fkey";
+            columns: ["customer_id"];
+            isOneToOne: false;
+            referencedRelation: "customers";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "wallet_transactions_package_id_fkey";
+            columns: ["package_id"];
+            isOneToOne: false;
+            referencedRelation: "packages";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       bookings: {
         Row: {
@@ -144,6 +284,7 @@ export interface Database {
           total_price: number;
           status: BookingStatus;
           payment_intent_id: string | null;
+          note: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -156,6 +297,7 @@ export interface Database {
           total_price: number;
           status?: BookingStatus;
           payment_intent_id?: string | null;
+          note?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -168,6 +310,7 @@ export interface Database {
           total_price?: number;
           status?: BookingStatus;
           payment_intent_id?: string | null;
+          note?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -310,6 +453,42 @@ export interface Database {
         Returns: {
           cancelled_count: number;
         }[];
+      };
+      // authenticated only (requires auth.uid()) - pays for the caller's own
+      // pending bookings from their hour wallet instead of Stripe. See
+      // supabase/migrations/20260813060000_pay_with_wallet_rpc.sql.
+      pay_with_wallet: {
+        Args: {
+          p_booking_ids: string[];
+        };
+        Returns: {
+          booking_ids: string[];
+          customer_id: string;
+          hours_deducted_all_time: number;
+          hours_deducted_off_peak: number;
+        }[];
+      };
+      // authenticated + is_admin() inside - atomic counter top-up/clawback.
+      // See supabase/migrations/20260813070000_admin_adjust_wallet.sql.
+      admin_adjust_wallet: {
+        Args: {
+          p_customer_id: string;
+          p_all_time_change: number;
+          p_off_peak_change: number;
+          p_reason: string;
+        };
+        Returns: {
+          customer_id: string;
+          wallet_hours_all_time: number;
+          wallet_hours_off_peak: number;
+        }[];
+      };
+      // authenticated + is_admin() inside - single-call dashboard aggregate.
+      // Cash-flow (transactions-based) + current-month scoping - see
+      // supabase/migrations/20260813100000_admin_analytics_cash_flow.sql.
+      get_admin_analytics: {
+        Args: Record<string, never>;
+        Returns: AdminAnalytics;
       };
     };
   };

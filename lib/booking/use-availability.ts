@@ -29,11 +29,18 @@ export type AvailabilityMap = Map<string, BookingStatus>;
  * why this uses Broadcast-from-Database instead of Postgres Changes (guests
  * have no RLS SELECT access to `bookings`, only to the sanitized view).
  */
-export function useAvailability(isoDate: string) {
-  const [availability, setAvailability] = useState<AvailabilityMap>(
-    () => new Map()
+export function useAvailability(
+  isoDate: string,
+  initialAvailability?: Record<string, BookingStatus>
+) {
+  const [availability, setAvailability] = useState<AvailabilityMap>(() =>
+    initialAvailability
+      ? new Map(Object.entries(initialAvailability))
+      : new Map()
   );
-  const [loadedDate, setLoadedDate] = useState<string | null>(null);
+  const [loadedDate, setLoadedDate] = useState<string | null>(() =>
+    initialAvailability ? isoDate : null
+  );
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const dateRangeRef = useRef(getDayRangeUTC(isoDate));
   const isLoading = loadedDate !== isoDate;
@@ -41,6 +48,11 @@ export function useAvailability(isoDate: string) {
   useEffect(() => {
     const range = getDayRangeUTC(isoDate);
     dateRangeRef.current = range;
+
+    // Server already hydrated this date - skip the duplicate client fetch.
+    if (initialAvailability && loadedDate === isoDate) {
+      return;
+    }
 
     const supabase = createClient();
     let isCancelled = false;
@@ -72,6 +84,9 @@ export function useAvailability(isoDate: string) {
     return () => {
       isCancelled = true;
     };
+    // `initialAvailability` / `loadedDate` are intentionally omitted: we only
+    // want to refetch when the calendar date changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isoDate]);
 
   useEffect(() => {

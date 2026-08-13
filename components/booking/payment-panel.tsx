@@ -11,7 +11,7 @@ interface PaymentPanelProps {
   clientSecret: string;
   amount: number;
   customerName?: string;
-  onSuccess: () => void;
+  onSuccess: (paymentIntentId: string) => void;
 }
 
 /**

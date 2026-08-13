@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -9,12 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { PaymentPanel } from "@/components/booking/payment-panel";
+import { WalletPayButton } from "@/components/booking/wallet-pay-button";
 import {
   cancelPendingBookings,
-  createPaymentIntent,
+  finalizePaidBookings,
   type PaymentIntentData,
 } from "@/app/booking/payment-actions";
 import { useCountdownTo } from "@/lib/booking/use-countdown";
+import {
+  canPayWithWallet,
+  getWalletHoursBreakdown,
+  type WalletBalance,
+} from "@/lib/booking/pricing";
 import { formatCountdown, formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -41,11 +47,20 @@ export interface PaymentPageData {
 // changes, update this too so the countdown doesn't mislead guests.
 const PENDING_BOOKING_TTL_MS = 15 * 60 * 1000;
 
-export function PaymentPageClient({ data }: { data: PaymentPageData }) {
+export function PaymentPageClient({
+  data,
+  initialPayment,
+  initialPaymentError,
+  walletBalance,
+}: {
+  data: PaymentPageData;
+  initialPayment: PaymentIntentData | null;
+  initialPaymentError: string | null;
+  walletBalance: WalletBalance | null;
+}) {
   const router = useRouter();
-  const [payment, setPayment] = useState<PaymentIntentData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
+  const [isFinalizing, setIsFinalizing] = useState(false);
   const [isCancelling, startCancelTransition] = useTransition();
 
   const bookingIds = useMemo(
@@ -56,41 +71,20 @@ export function PaymentPageClient({ data }: { data: PaymentPageData }) {
     () => data.bookings.reduce((sum, b) => sum + b.totalPrice, 0),
     [data.bookings]
   );
+  const walletBreakdown = useMemo(
+    () => getWalletHoursBreakdown(data.bookings),
+    [data.bookings]
+  );
+  const hasEnoughWalletBalance =
+    walletBalance !== null && canPayWithWallet(walletBreakdown, walletBalance);
 
   const deadlineMs =
     new Date(data.createdAtIso).getTime() + PENDING_BOOKING_TTL_MS;
   const secondsLeft = useCountdownTo(deadlineMs);
   const isExpired = secondsLeft <= 0;
-  const canCancel = !succeeded && !isExpired;
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void createPaymentIntent(bookingIds)
-      .then((result) => {
-        if (cancelled) return;
-        if (!result.data) {
-          setLoadError(
-            result.error ?? "Could not start payment. Please try again."
-          );
-          return;
-        }
-        setLoadError(null);
-        setPayment(result.data);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setLoadError(
-          err instanceof Error
-            ? err.message
-            : "Could not start payment. Please try again."
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bookingIds]);
+  const canCancel = !succeeded && !isExpired && !isFinalizing;
+  const loadError = initialPayment ? null : initialPaymentError;
+  const payment = initialPayment;
 
   function handleCancel() {
     if (!canCancel || isCancelling) return;
@@ -105,6 +99,25 @@ export function PaymentPageClient({ data }: { data: PaymentPageData }) {
       toast.success("Booking cancelled successfully");
       router.push("/booking");
     });
+  }
+
+  async function handlePaymentSuccess(paymentIntentId: string) {
+    setIsFinalizing(true);
+    const result = await finalizePaidBookings(paymentIntentId, bookingIds);
+    if (result.error) {
+      // Payment succeeded at Stripe; webhook may still confirm. Surface a
+      // soft warning instead of blocking the success UI.
+      toast.error("Payment received, but confirmation is delayed.", {
+        description: "If the slot stays unpaid, contact the club with your receipt.",
+      });
+      console.error("[payment] finalizePaidBookings:", result.error);
+    }
+    setSucceeded(true);
+    setIsFinalizing(false);
+  }
+
+  function handleWalletSuccess() {
+    setSucceeded(true);
   }
 
   return (
@@ -143,6 +156,29 @@ export function PaymentPageClient({ data }: { data: PaymentPageData }) {
             )}
           </CardHeader>
           <CardContent className="space-y-4">
+            {!succeeded && !isExpired && walletBalance && (
+              <>
+                {hasEnoughWalletBalance ? (
+                  <WalletPayButton
+                    bookingIds={bookingIds}
+                    breakdown={walletBreakdown}
+                    balance={walletBalance}
+                    onSuccess={handleWalletSuccess}
+                  />
+                ) : (
+                  <p className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+                    Insufficient wallet hours. Pay via Stripe below, or top up
+                    your wallet.
+                  </p>
+                )}
+                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                  <Separator className="flex-1" />
+                  or pay with Stripe
+                  <Separator className="flex-1" />
+                </div>
+              </>
+            )}
+
             {succeeded ? (
               <SuccessState />
             ) : loadError ? (
@@ -154,13 +190,19 @@ export function PaymentPageClient({ data }: { data: PaymentPageData }) {
                 clientSecret={payment.clientSecret}
                 amount={payment.amount}
                 customerName={data.customerFullName}
-                onSuccess={() => setSucceeded(true)}
+                onSuccess={handlePaymentSuccess}
               />
             ) : (
               <div className="flex flex-col items-center gap-2 py-10 text-sm text-muted-foreground">
                 <Loader2 className="size-6 animate-spin" />
                 Preparing payment…
               </div>
+            )}
+
+            {isFinalizing && (
+              <p className="text-center text-sm text-muted-foreground">
+                Confirming your booking…
+              </p>
             )}
 
             {canCancel && (

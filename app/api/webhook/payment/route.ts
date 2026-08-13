@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { bookingIdsSchema } from "@/lib/booking/schema";
+import { sendBookingETicket } from "@/lib/email/send-eticket";
 
 // App Router Route Handlers, unlike the old Pages Router API routes, never
 // auto-parse the request body - `await request.text()` below already
@@ -134,5 +135,30 @@ export async function POST(request: Request) {
   console.info(
     `[webhook/payment] confirmed bookings [${data?.booking_ids?.join(", ")}] via payment intent ${paymentIntentId}.`
   );
+
+  // Fire-and-forget via Next.js `after()`: Stripe gets 200 immediately while
+  // the E-Ticket send (and any Stripe charge lookup for the guest email)
+  // continues in the background. Errors here must never fail the webhook.
+  const confirmedIds = data?.booking_ids ?? bookingIdsResult.data;
+  after(() => {
+    try {
+      void sendBookingETicket({
+        bookingIds: confirmedIds,
+        paymentIntent,
+        stripe: getStripeClient(),
+      }).catch((emailError) => {
+        console.error(
+          "[webhook/payment] E-Ticket send failed:",
+          emailError instanceof Error ? emailError.message : emailError
+        );
+      });
+    } catch (syncError) {
+      console.error(
+        "[webhook/payment] E-Ticket schedule failed:",
+        syncError instanceof Error ? syncError.message : syncError
+      );
+    }
+  });
+
   return NextResponse.json({ received: true, bookingIds: data?.booking_ids });
 }

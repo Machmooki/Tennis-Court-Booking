@@ -2,10 +2,12 @@
 
 import Stripe from "stripe";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { bookingIdsSchema } from "@/lib/booking/schema";
 
 export interface PaymentIntentData {
   clientSecret: string;
+  paymentIntentId: string;
   /** Decimal THB amount (not satang) - for display via `formatCurrency`. */
   amount: number;
 }
@@ -18,11 +20,25 @@ export type CancelPendingBookingsResult =
   | { error: string; cancelledCount?: undefined }
   | { error?: undefined; cancelledCount: number };
 
+export type FinalizePaidBookingsResult =
+  | { error: string }
+  | { error?: undefined; bookingIds: string[] };
+
+export interface PayWithWalletData {
+  bookingIds: string[];
+  hoursDeductedAllTime: number;
+  hoursDeductedOffPeak: number;
+}
+
+export type PayWithWalletResult =
+  | { error: string; data?: undefined }
+  | { error?: undefined; data: PayWithWalletData };
+
 function getStripeClient(): Stripe {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
     throw new Error(
-      "Missing STRIPE_SECRET_KEY. Add it to .env.local and restart the dev server."
+      "Missing STRIPE_SECRET_KEY. Add it to .env.local / Vercel env and restart."
     );
   }
   return new Stripe(secretKey);
@@ -109,6 +125,7 @@ export async function createPaymentIntent(
     return {
       data: {
         clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
         amount: batch.total_price,
       },
     };
@@ -124,6 +141,131 @@ export async function createPaymentIntent(
           : "Failed to start payment. Please try again.",
     };
   }
+}
+
+/**
+ * Confirms pending bookings after the browser sees a succeeded PaymentIntent.
+ * Required on Vercel/production when the Stripe Dashboard webhook is missing
+ * or delayed - `stripe listen` only forwards events to localhost.
+ *
+ * Never trusts the client alone: re-fetches the PaymentIntent from Stripe,
+ * checks `status === succeeded`, and verifies metadata booking ids match
+ * before calling `confirm_booking_payment` with the service role.
+ */
+export async function finalizePaidBookings(
+  paymentIntentId: string,
+  bookingIds: string[]
+): Promise<FinalizePaidBookingsResult> {
+  const trimmedIntentId = paymentIntentId.trim();
+  if (!trimmedIntentId.startsWith("pi_")) {
+    return { error: "Invalid payment reference." };
+  }
+
+  const parsed = bookingIdsSchema.safeParse(bookingIds);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid booking." };
+  }
+
+  let stripe: Stripe;
+  try {
+    stripe = getStripeClient();
+  } catch {
+    return { error: "Payments are temporarily unavailable." };
+  }
+
+  let paymentIntent: Stripe.PaymentIntent;
+  try {
+    paymentIntent = await stripe.paymentIntents.retrieve(trimmedIntentId);
+  } catch (retrieveError) {
+    console.error(
+      "[finalizePaidBookings] Stripe retrieve failed:",
+      retrieveError
+    );
+    return { error: "Could not verify payment with Stripe." };
+  }
+
+  if (paymentIntent.status !== "succeeded") {
+    return { error: "Payment is not complete yet." };
+  }
+
+  const metadataIds = (paymentIntent.metadata?.booking_ids ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .sort();
+  const requestedIds = [...parsed.data].sort();
+
+  if (
+    metadataIds.length !== requestedIds.length ||
+    metadataIds.some((id, index) => id !== requestedIds[index])
+  ) {
+    console.error(
+      "[finalizePaidBookings] booking_ids mismatch:",
+      { paymentIntentId: trimmedIntentId, metadataIds, requestedIds }
+    );
+    return { error: "Payment does not match these bookings." };
+  }
+
+  const providerReference =
+    typeof paymentIntent.latest_charge === "string"
+      ? paymentIntent.latest_charge
+      : paymentIntent.id;
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .rpc("confirm_booking_payment", {
+      p_booking_ids: parsed.data,
+      p_payment_intent_id: paymentIntent.id,
+      p_provider_reference: providerReference,
+    })
+    .single();
+
+  if (error) {
+    console.error(
+      "[finalizePaidBookings] confirm_booking_payment failed:",
+      error.message
+    );
+    return { error: error.message };
+  }
+
+  return { bookingIds: data?.booking_ids ?? parsed.data };
+}
+
+/**
+ * Pays for the signed-in member's own pending bookings out of their hour
+ * wallet instead of Stripe. All validation (enough balance, bookings still
+ * pending, bookings actually belong to this member) and the deduct + confirm
+ * mutation happen atomically inside the `pay_with_wallet` RPC - this action
+ * is just a thin, typed wrapper plus input validation.
+ */
+export async function payWithWallet(
+  bookingIds: string[]
+): Promise<PayWithWalletResult> {
+  const parsed = bookingIdsSchema.safeParse(bookingIds);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Invalid booking." };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .rpc("pay_with_wallet", { p_booking_ids: parsed.data })
+    .single();
+
+  if (error) {
+    console.error("[payWithWallet] pay_with_wallet RPC failed:", error.message);
+    return { error: error.message };
+  }
+  if (!data) {
+    return { error: "Payment failed. Please try again." };
+  }
+
+  return {
+    data: {
+      bookingIds: data.booking_ids,
+      hoursDeductedAllTime: data.hours_deducted_all_time,
+      hoursDeductedOffPeak: data.hours_deducted_off_peak,
+    },
+  };
 }
 
 /**

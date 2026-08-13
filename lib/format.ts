@@ -14,14 +14,23 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: BOOKING_TIMEZONE,
 });
 
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  timeStyle: "short",
+// Strict 24-hour clock (00–23), zero-padded, no AM/PM. `hourCycle: "h23"`
+// beats `hour12: false` alone - some engines still emit 12-hour forms for
+// certain locales without an explicit cycle. Always Asia/Bangkok.
+const timeFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
   timeZone: BOOKING_TIMEZONE,
 });
 
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
+const dateTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
   timeZone: BOOKING_TIMEZONE,
 });
 
@@ -34,10 +43,12 @@ export function formatDate(iso: string): string {
   return dateFormatter.format(new Date(iso));
 }
 
+/** Bangkok wall-clock time as `HH:mm` (24-hour), e.g. `"06:00"`, `"14:30"`. */
 export function formatTime(iso: string): string {
   return timeFormatter.format(new Date(iso));
 }
 
+/** Bangkok date + 24-hour time, e.g. `"13 Aug 2026, 06:00"`. */
 export function formatDateTime(iso: string): string {
   return dateTimeFormatter.format(new Date(iso));
 }

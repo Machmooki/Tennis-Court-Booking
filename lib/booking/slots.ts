@@ -1,25 +1,20 @@
-import { BOOKING_TIMEZONE, getDayRangeUTC } from "@/lib/date";
+import { getDayRangeUTC } from "@/lib/date";
+import { formatTime } from "@/lib/format";
 
 // Booking-grid time slots, evaluated in Bangkok wall-clock time (see
 // `lib/date.ts`) since courts don't have a per-court timezone field yet and
 // the business only operates in Thailand.
-export const SLOT_START_HOUR = 6; // 6 AM Bangkok
-export const SLOT_END_HOUR = 22; // 10 PM Bangkok (exclusive)
+export const SLOT_START_HOUR = 6; // 06:00 Bangkok
+export const SLOT_END_HOUR = 24; // 00:00 Bangkok (exclusive)
 export const SLOT_DURATION_MINUTES = 60;
 
 export interface TimeSlot {
   /** `${court-agnostic} start time`, ISO 8601, UTC instant. */
   startIso: string;
   endIso: string;
-  /** Short label for the grid's time-axis, e.g. "6:00 AM". */
+  /** Short label for the grid's time-axis, e.g. "06:00". */
   label: string;
 }
-
-const timeLabelFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "numeric",
-  minute: "2-digit",
-  timeZone: BOOKING_TIMEZONE,
-});
 
 /** Generates the fixed list of bookable hourly slots for one ISO date. */
 export function getDaySlots(isoDate: string): TimeSlot[] {
@@ -47,7 +42,7 @@ export function getDaySlots(isoDate: string): TimeSlot[] {
     slots.push({
       startIso: start.toISOString(),
       endIso: end.toISOString(),
-      label: timeLabelFormatter.format(start),
+      label: formatTime(start.toISOString()),
     });
   }
 

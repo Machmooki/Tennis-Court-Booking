@@ -2,15 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useFormStatus } from "react-dom";
-import { CalendarDays, LayoutGrid, Loader2, LogOut } from "lucide-react";
+import {
+  CalendarDays,
+  LayoutDashboard,
+  LayoutGrid,
+  Package,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/actions/auth";
+import { SignOutButton } from "@/components/sign-out-button";
 
 const NAV_ITEMS = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/courts", label: "Courts", icon: LayoutGrid },
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
+  { href: "/admin/packages", label: "Packages", icon: Package },
+  { href: "/admin/members", label: "Members", icon: Users },
 ] as const;
 
 export function AdminNav({ email }: { email: string | null }) {
@@ -21,7 +29,12 @@ export function AdminNav({ email }: { email: string | null }) {
       <div className="flex h-14 items-center justify-between gap-2 px-3 sm:px-6">
         <nav className="flex items-center gap-1">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const isActive = pathname.startsWith(href);
+            // `/admin` must match exactly - every other admin route also
+            // starts with "/admin" and would otherwise keep this tab active.
+            const isActive =
+              href === "/admin"
+                ? pathname === "/admin"
+                : pathname.startsWith(href);
             return (
               <Link
                 key={href}
@@ -52,28 +65,5 @@ export function AdminNav({ email }: { email: string | null }) {
         </div>
       </div>
     </header>
-  );
-}
-
-// `useFormStatus` only reports its parent `<form>`'s pending state when
-// called from a component *nested inside* that form, not the component that
-// renders the form itself - hence this small dedicated component.
-function SignOutButton() {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      variant="outline"
-      className="h-11 w-11"
-      disabled={pending}
-      aria-label="Sign out"
-    >
-      {pending ? (
-        <Loader2 className="size-4 animate-spin" />
-      ) : (
-        <LogOut className="size-4" />
-      )}
-    </Button>
   );
 }

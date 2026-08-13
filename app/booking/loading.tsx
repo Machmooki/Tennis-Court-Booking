@@ -1,6 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Matches `getDaySlots()` (6 AM - 10 PM, hourly) and a typical 3-court
+// Matches `getDaySlots()` (06:00–22:00, hourly) and a typical 3-court
 // layout, so the skeleton grid's row/column count lines up with the real
 // `<SlotGrid>` and there's no layout jump once data arrives.
 const SKELETON_ROWS = 16;

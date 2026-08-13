@@ -10,7 +10,7 @@ export default function Home() {
       <p className="max-w-sm text-sm text-muted-foreground">
         Book a court in seconds — no account needed.
       </p>
-      <div className="flex gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <Button
           nativeButton={false}
           render={<Link href="/booking" />}
@@ -20,8 +20,16 @@ export default function Home() {
         </Button>
         <Button
           nativeButton={false}
-          render={<Link href="/login" />}
+          render={<Link href="/member/login" />}
           variant="outline"
+          className="h-11"
+        >
+          Sign in
+        </Button>
+        <Button
+          nativeButton={false}
+          render={<Link href="/login" />}
+          variant="ghost"
           className="h-11"
         >
           Admin sign in
