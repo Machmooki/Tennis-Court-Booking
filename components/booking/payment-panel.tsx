@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
 import type {
@@ -30,6 +30,14 @@ export function PaymentPanel({
 }: PaymentPanelProps) {
   const [stripe, setStripe] = useState<Stripe | null | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const elementsOptions = useMemo<StripeElementsOptionsClientSecret>(
+    () => ({
+      clientSecret,
+      appearance: { theme: "stripe" },
+      locale: "en",
+    }),
+    [clientSecret]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -71,12 +79,12 @@ export function PaymentPanel({
   }
 
   return (
-    <Elements
-      key={clientSecret}
-      stripe={stripe}
-      options={elementsOptions}
-    >
-      <PaymentForm amount={amount} customerName={customerName} onSuccess={onSuccess} />
+    <Elements key={clientSecret} stripe={stripe} options={elementsOptions}>
+      <PaymentForm
+        amount={amount}
+        customerName={customerName}
+        onSuccess={onSuccess}
+      />
     </Elements>
   );
 }
