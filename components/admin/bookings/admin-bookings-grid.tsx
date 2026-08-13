@@ -30,6 +30,7 @@ export interface AdminGridBooking {
   court_id: string;
   start_time: string;
   end_time: string;
+  created_at: string;
   status: BookingStatus;
   total_price: number;
   note: string | null;
@@ -160,6 +161,9 @@ export function AdminBookingsGrid({
                             bookingId: booking.id,
                             courtName: court.name,
                             timeLabel: slot.label,
+                            startIso: booking.start_time,
+                            endIso: booking.end_time,
+                            createdAtIso: booking.created_at,
                             status: booking.status,
                             totalPrice: booking.total_price,
                             note: booking.note,

@@ -45,7 +45,7 @@ export interface PaymentPageData {
 // Must match the auto-cancel window in
 // supabase/migrations/20260811030000_auto_cancel_cron.sql - if that window
 // changes, update this too so the countdown doesn't mislead guests.
-const PENDING_BOOKING_TTL_MS = 15 * 60 * 1000;
+const PENDING_BOOKING_TTL_MS = 5 * 60 * 1000;
 
 export function PaymentPageClient({
   data,

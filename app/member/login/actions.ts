@@ -5,6 +5,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { memberSignInSchema } from "@/lib/member/schema";
 
+// Phase 7.4 note: Email/Password is a placeholder auth strategy - see the
+// comment on `registerMember` (app/member/register/actions.ts) for why
+// Supabase Phone OTP is the intended long-term replacement.
+
 export type SignInMemberResult = { error: string } | { error?: undefined };
 
 const formSchema = memberSignInSchema.extend({
@@ -50,7 +54,7 @@ export async function signInMember(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
     password: parsed.data.password,
   });
@@ -64,5 +68,12 @@ export async function signInMember(
     return { error: mapAuthError(error) };
   }
 
-  redirect(parsed.data.redirectTo);
+  const role = (data.user?.app_metadata as { role?: unknown } | undefined)
+    ?.role;
+
+  if (role === "admin") {
+    redirect("/admin");
+  }
+
+  redirect("/member/dashboard");
 }

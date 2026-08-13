@@ -1,5 +1,5 @@
 // Hand-written to match the SQL migrations under `supabase/migrations/`,
-// most recently `20260813100000_admin_analytics_cash_flow.sql`.
+// most recently `20260813110000_confirm_package_topup.sql`.
 // Once the project is linked, replace with:
 //   supabase gen types typescript --linked > types/database.ts
 //
@@ -489,6 +489,24 @@ export interface Database {
       get_admin_analytics: {
         Args: Record<string, never>;
         Returns: AdminAnalytics;
+      };
+      // service_role only - credits a member wallet after a package Stripe
+      // payment succeeds. See
+      // supabase/migrations/20260813110000_confirm_package_topup.sql.
+      confirm_package_topup: {
+        Args: {
+          p_customer_id: string;
+          p_package_id: string;
+          p_payment_intent_id: string;
+        };
+        Returns: {
+          customer_id: string;
+          package_id: string;
+          hours_credited: number;
+          usable_at: PackageUsableAt;
+          wallet_hours_all_time: number;
+          wallet_hours_off_peak: number;
+        }[];
       };
     };
   };

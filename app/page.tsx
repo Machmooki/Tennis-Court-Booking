@@ -26,14 +26,6 @@ export default function Home() {
         >
           Sign in
         </Button>
-        <Button
-          nativeButton={false}
-          render={<Link href="/login" />}
-          variant="ghost"
-          className="h-11"
-        >
-          Admin sign in
-        </Button>
       </div>
     </div>
   );

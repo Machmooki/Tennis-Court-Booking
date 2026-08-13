@@ -29,6 +29,13 @@ function mapSignUpError(error: { message: string; code?: string }): string {
  * `handle_new_user_auto_link` (Phase 5.1/5.4.1) reads on the `auth.users`
  * AFTER INSERT trigger to auto-link past guest bookings (or provision a
  * fresh `customers` row) by phone number.
+ *
+ * Phase 7.4 note: Email/Password is a placeholder auth strategy. Since every
+ * guest booking is already keyed by phone number, Supabase Phone/SMS OTP
+ * (`supabase.auth.signInWithOtp({ phone })`) is the more natural long-term
+ * fit here and should replace this flow once SMS provider costs/volume are
+ * sorted out - the auto-link trigger already keys off `phone`, so swapping
+ * the auth method shouldn't require touching that linking logic.
  */
 export async function registerMember(
   _prevState: RegisterMemberResult,

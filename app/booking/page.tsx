@@ -1,8 +1,12 @@
+import { Suspense } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDayRangeUTC, isValidIsoDate, todayIsoDate } from "@/lib/date";
 import { BookingDateNav } from "@/components/booking/date-nav";
+import { BookingAuthHeader } from "@/components/booking/booking-auth-header";
 import { SlotGrid } from "@/components/booking/slot-grid";
 import { CheckoutBar } from "@/components/booking/checkout-bar";
+import { Skeleton } from "@/components/ui/skeleton";
 import { slotKey } from "@/lib/booking/slots";
 import type { BookingStatus } from "@/types/database";
 
@@ -55,6 +59,23 @@ export default async function BookingPage({
 
   return (
     <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur supports-backdrop-filter:bg-card/60">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
+          <Link
+            href="/"
+            aria-label="Back to home"
+            className="inline-flex min-h-11 items-center text-sm font-semibold tracking-tight transition-opacity hover:opacity-70 focus-visible:rounded-md focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
+          >
+            Tennis Court Booking
+          </Link>
+          <Suspense
+            fallback={<Skeleton className="h-9 w-24 rounded-full bg-muted/70" />}
+          >
+            <BookingAuthHeader />
+          </Suspense>
+        </div>
+      </header>
+
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 p-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">

@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   CalendarDays,
+  Eye,
   LayoutDashboard,
   LayoutGrid,
   Package,
+  Receipt,
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,6 +21,7 @@ const NAV_ITEMS = [
   { href: "/admin/bookings", label: "Bookings", icon: CalendarDays },
   { href: "/admin/packages", label: "Packages", icon: Package },
   { href: "/admin/members", label: "Members", icon: Users },
+  { href: "/admin/transactions", label: "Transactions", icon: Receipt },
 ] as const;
 
 export function AdminNav({ email }: { email: string | null }) {
@@ -54,6 +57,13 @@ export function AdminNav({ email }: { email: string | null }) {
         </nav>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/member/dashboard"
+            className="flex min-h-9 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Eye className="size-4" />
+            <span className="hidden sm:inline">Member View</span>
+          </Link>
           {email && (
             <span className="hidden max-w-40 truncate text-xs text-muted-foreground sm:inline">
               {email}

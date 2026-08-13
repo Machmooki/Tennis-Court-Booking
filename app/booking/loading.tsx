@@ -9,6 +9,13 @@ const SKELETON_COLUMNS = 3;
 export default function BookingLoading() {
   return (
     <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-30 border-b bg-card/80">
+        <div className="mx-auto flex h-14 w-full max-w-3xl items-center justify-between px-4">
+          <Skeleton className="h-4 w-24 rounded-full bg-muted/70" />
+          <Skeleton className="h-9 w-24 rounded-full bg-muted/70" />
+        </div>
+      </header>
+
       <div className="mx-auto w-full max-w-3xl flex-1 space-y-4 p-4">
         <div className="space-y-2">
           <Skeleton className="h-8 w-48" />

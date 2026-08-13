@@ -25,7 +25,7 @@ export default async function AdminBookingsPage({
       supabase
         .from("bookings")
         .select(
-          "id, court_id, start_time, end_time, status, total_price, note, customer:customers(id, full_name, phone)"
+          "id, court_id, start_time, end_time, created_at, status, total_price, note, customer:customers(id, full_name, phone)"
         )
         .neq("status", "cancelled")
         .gte("start_time", startIso)
