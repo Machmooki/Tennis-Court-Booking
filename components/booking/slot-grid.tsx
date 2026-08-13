@@ -1,11 +1,9 @@
 "use client";
 
-import { Fragment, useMemo } from "react";
-import { SlotCell, type SlotStatus } from "@/components/booking/slot-cell";
+import { useState } from "react";
+import { CourtSelector } from "@/components/booking/court-selector";
+import { TimeSlotGrid } from "@/components/booking/time-slot-grid";
 import { useAvailability } from "@/lib/booking/use-availability";
-import { useBookingStore } from "@/lib/booking/store";
-import { getDaySlots, isSlotInPast, slotKey } from "@/lib/booking/slots";
-import { getSlotPrice } from "@/lib/booking/pricing";
 import type { BookingStatus, CourtRow } from "@/types/database";
 
 export function SlotGrid({
@@ -17,99 +15,73 @@ export function SlotGrid({
   courts: CourtRow[];
   initialAvailability?: Record<string, BookingStatus>;
 }) {
-  const { availability, isLoading, isRealtimeConnected } = useAvailability(
-    date,
-    initialAvailability
-  );
-  const selectedSlots = useBookingStore((s) => s.selectedSlots);
-  const toggleSlot = useBookingStore((s) => s.toggleSlot);
+  const [selectedCourtId, setSelectedCourtId] = useState(courts[0]?.id ?? "");
+  const selectedCourt =
+    courts.find((court) => court.id === selectedCourtId) ?? courts[0];
 
-  const slots = useMemo(() => getDaySlots(date), [date]);
-  const selectedKeys = useMemo(
-    () => new Set(selectedSlots.map((s) => slotKey(s.courtId, s.startIso))),
-    [selectedSlots]
-  );
-
-  if (courts.length === 0) {
+  if (!selectedCourt) {
     return (
-      <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-        No courts are available for booking right now.
-      </div>
+      <section>
+        <h2 className="mt-8 mb-4 text-2xl font-semibold">Available Times</h2>
+        <div className="rounded-3xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+          No courts are available for booking right now.
+        </div>
+      </section>
     );
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-        <span
-          className={`size-2 rounded-full ${
-            isRealtimeConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
-          }`}
-        />
-        {isRealtimeConnected ? "Live availability" : "Connecting…"}
-        {isLoading && " · Loading…"}
-      </div>
+    <section>
+      <h2 className="mt-8 mb-4 text-2xl font-semibold">Choose a Court</h2>
+      <CourtSelector
+        courts={courts}
+        selectedCourtId={selectedCourt.id}
+        onCourtChange={setSelectedCourtId}
+      />
 
-      <div className="overflow-x-auto rounded-lg border">
-        <div
-          className="grid min-w-max"
-          style={{
-            gridTemplateColumns: `72px repeat(${courts.length}, minmax(84px, 1fr))`,
-          }}
-        >
-          <div className="sticky left-0 z-10 border-b bg-card" />
-          {courts.map((court) => (
-            <div
-              key={court.id}
-              className="border-b border-l bg-card p-2 text-center text-xs font-semibold"
-            >
-              {court.name}
-            </div>
-          ))}
+      <AvailabilityTimeSlots
+        key={date}
+        date={date}
+        court={selectedCourt}
+        initialAvailability={initialAvailability}
+      />
+    </section>
+  );
+}
 
-          {slots.map((slot) => (
-            <Fragment key={slot.startIso}>
-              <div className="sticky left-0 z-10 flex items-center justify-end border-b bg-card px-2 text-[11px] text-muted-foreground">
-                {slot.label}
-              </div>
-              {courts.map((court) => {
-                const key = slotKey(court.id, slot.startIso);
-                const isBooked = availability.has(key);
-                const isPast = isSlotInPast(slot.startIso);
-                const isSelected = selectedKeys.has(key);
-                const price = getSlotPrice(court, slot.startIso);
+function AvailabilityTimeSlots({
+  date,
+  court,
+  initialAvailability,
+}: {
+  date: string;
+  court: CourtRow;
+  initialAvailability?: Record<string, BookingStatus>;
+}) {
+  const { availability, isLoading, isRealtimeConnected } = useAvailability(
+    date,
+    initialAvailability
+  );
 
-                const status: SlotStatus = isSelected
-                  ? "selected"
-                  : isBooked
-                    ? "booked"
-                    : isPast
-                      ? "past"
-                      : "available";
-
-                return (
-                  <div key={court.id} className="border-b border-l p-1">
-                    <SlotCell
-                      status={status}
-                      price={price}
-                      ariaLabel={`${court.name}, ${slot.label}, ${status}, ${price}`}
-                      onSelect={() =>
-                        toggleSlot({
-                          courtId: court.id,
-                          courtName: court.name,
-                          startIso: slot.startIso,
-                          endIso: slot.endIso,
-                          price,
-                        })
-                      }
-                    />
-                  </div>
-                );
-              })}
-            </Fragment>
-          ))}
+  return (
+    <div className="mt-8">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <h2 className="text-2xl font-semibold">Available Times</h2>
+        <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+          <span
+            className={`size-2 rounded-full transition-all ${
+              isRealtimeConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
+            }`}
+          />
+          {isLoading
+            ? "Loading…"
+            : isRealtimeConnected
+              ? "Live"
+              : "Connecting…"}
         </div>
       </div>
+
+      <TimeSlotGrid date={date} court={court} availability={availability} />
     </div>
   );
 }

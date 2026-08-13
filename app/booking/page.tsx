@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getDayRangeUTC, isValidIsoDate, todayIsoDate } from "@/lib/date";
-import { BookingDateNav } from "@/components/booking/date-nav";
+import { BookingDateControls } from "@/components/booking/booking-date-controls";
 import { BookingAuthHeader } from "@/components/booking/booking-auth-header";
 import { SlotGrid } from "@/components/booking/slot-grid";
 import { CheckoutBar } from "@/components/booking/checkout-bar";
@@ -87,7 +87,10 @@ export default async function BookingPage({
           </p>
         </div>
 
-        <BookingDateNav date={date} />
+        <BookingDateControls
+          date={date}
+          courtIds={(courtsResult.data ?? []).map((court) => court.id)}
+        />
 
         <SlotGrid
           date={date}

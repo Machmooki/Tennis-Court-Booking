@@ -1,20 +1,17 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/format";
 
 export type SlotStatus = "available" | "selected" | "booked" | "past";
 
 interface SlotCellProps {
   status: SlotStatus;
-  price: number;
+  label: string;
   onSelect: () => void;
   ariaLabel: string;
 }
 
-// h-11/w-full keeps every tap target at least 44px tall, and the grid's
-// column width (see SlotGrid) keeps it comfortably wider than 44px too.
-export function SlotCell({ status, price, onSelect, ariaLabel }: SlotCellProps) {
+export function SlotCell({ status, label, onSelect, ariaLabel }: SlotCellProps) {
   const disabled = status === "booked" || status === "past";
 
   return (
@@ -25,18 +22,18 @@ export function SlotCell({ status, price, onSelect, ariaLabel }: SlotCellProps) 
       aria-pressed={status === "selected"}
       aria-label={ariaLabel}
       className={cn(
-        "flex h-11 w-full flex-col items-center justify-center rounded-md border text-[11px] font-medium leading-tight transition-colors",
+        "min-h-11 w-full rounded-full border px-4 py-3 text-center text-sm font-medium transition-all duration-200 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none",
         status === "available" &&
-          "border-border bg-card text-foreground hover:border-primary hover:bg-primary/5",
+          "border-border bg-background text-foreground hover:border-primary hover:shadow-sm",
         status === "selected" &&
-          "border-primary bg-primary text-primary-foreground",
+          "border-primary bg-primary text-primary-foreground shadow-md",
         status === "booked" &&
-          "cursor-not-allowed border-transparent bg-muted text-muted-foreground",
+          "cursor-not-allowed border-transparent bg-muted/40 text-muted-foreground opacity-50",
         status === "past" &&
-          "cursor-not-allowed border-transparent bg-muted/50 text-muted-foreground/50"
+          "cursor-not-allowed border-transparent bg-muted/40 text-muted-foreground opacity-50"
       )}
     >
-      {status === "booked" ? "Booked" : formatCurrency(price)}
+      {label}
     </button>
   );
 }

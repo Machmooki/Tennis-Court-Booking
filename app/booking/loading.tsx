@@ -1,10 +1,8 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Matches `getDaySlots()` (06:00–22:00, hourly) and a typical 3-court
-// layout, so the skeleton grid's row/column count lines up with the real
-// `<SlotGrid>` and there's no layout jump once data arrives.
-const SKELETON_ROWS = 16;
-const SKELETON_COLUMNS = 3;
+// Matches `getDaySlots()` (06:00–00:00, hourly) so the skeleton count lines
+// up with the real time grid and there is no vertical jump once data arrives.
+const SKELETON_SLOTS = 18;
 
 export default function BookingLoading() {
   return (
@@ -22,48 +20,38 @@ export default function BookingLoading() {
           <Skeleton className="h-4 w-72" />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
-          <Skeleton className="h-11 flex-1 rounded-lg" />
-          <Skeleton className="h-11 w-11 shrink-0 rounded-lg" />
+        <div className="flex justify-center pt-2">
+          <Skeleton className="h-9 w-52 rounded-full" />
         </div>
 
-        <div className="space-y-2">
-          <Skeleton className="h-4 w-32" />
+        <div className="flex gap-4 overflow-hidden px-2 py-4">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <Skeleton
+              key={`date-${index}`}
+              className="h-[90px] min-w-[70px] rounded-3xl"
+            />
+          ))}
+        </div>
 
-          <div className="overflow-x-auto rounded-lg border">
-            <div
-              className="grid min-w-max"
-              style={{
-                gridTemplateColumns: `72px repeat(${SKELETON_COLUMNS}, minmax(84px, 1fr))`,
-              }}
-            >
-              <div className="border-b bg-card" />
-              {Array.from({ length: SKELETON_COLUMNS }).map((_, i) => (
-                <div
-                  key={`header-${i}`}
-                  className="flex items-center justify-center border-b border-l bg-card p-2"
-                >
-                  <Skeleton className="h-4 w-12" />
-                </div>
-              ))}
+        <div>
+          <Skeleton className="mt-8 mb-4 h-8 w-44" />
+          <div className="flex gap-2 overflow-hidden py-1">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton
+                key={`court-${index}`}
+                className="h-11 min-w-24 rounded-full"
+              />
+            ))}
+          </div>
 
-              {Array.from({ length: SKELETON_ROWS }).map((_, row) => (
-                <div key={`row-${row}`} className="contents">
-                  <div className="flex items-center justify-end border-b bg-card px-2">
-                    <Skeleton className="h-3 w-10" />
-                  </div>
-                  {Array.from({ length: SKELETON_COLUMNS }).map((_, col) => (
-                    <div
-                      key={`cell-${row}-${col}`}
-                      className="border-b border-l p-1"
-                    >
-                      <Skeleton className="h-11 w-full rounded-md" />
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
+          <div className="mt-8 mb-4 flex items-center justify-between">
+            <Skeleton className="h-8 w-44" />
+            <Skeleton className="h-4 w-16 rounded-full" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-3 sm:grid-cols-4">
+            {Array.from({ length: SKELETON_SLOTS }).map((_, index) => (
+              <Skeleton key={`slot-${index}`} className="h-11 rounded-full" />
+            ))}
           </div>
         </div>
 

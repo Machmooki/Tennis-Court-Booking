@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Elements } from "@stripe/react-stripe-js";
-import type { Stripe } from "@stripe/stripe-js";
+import type {
+  Stripe,
+  StripeElementsOptionsClientSecret,
+} from "@stripe/stripe-js";
 import { PaymentForm } from "@/components/booking/payment-form";
 import { getBrowserStripe } from "@/lib/stripe/client";
 
@@ -71,11 +74,7 @@ export function PaymentPanel({
     <Elements
       key={clientSecret}
       stripe={stripe}
-      options={{
-        clientSecret,
-        appearance: { theme: "stripe" },
-        locale: "en",
-      }}
+      options={elementsOptions}
     >
       <PaymentForm amount={amount} customerName={customerName} onSuccess={onSuccess} />
     </Elements>
