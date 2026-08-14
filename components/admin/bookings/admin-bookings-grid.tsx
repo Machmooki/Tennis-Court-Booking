@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   AdminSlotCell,
   type AdminSlotStatus,
@@ -48,12 +47,13 @@ export function AdminBookingsGrid({
   date,
   courts,
   bookings,
+  onBookingsChanged,
 }: {
   date: string;
   courts: AdminGridCourt[];
   bookings: AdminGridBooking[];
+  onBookingsChanged: () => void;
 }) {
-  const router = useRouter();
   const slots = useMemo(() => getDaySlots(date), [date]);
 
   const bookingMap = useMemo(() => {
@@ -188,7 +188,7 @@ export function AdminBookingsGrid({
         }}
         onSuccess={() => {
           setCreateTarget(null);
-          router.refresh();
+          onBookingsChanged();
         }}
       />
 
@@ -199,7 +199,7 @@ export function AdminBookingsGrid({
         }}
         onSuccess={() => {
           setDetailsTarget(null);
-          router.refresh();
+          onBookingsChanged();
         }}
       />
     </>

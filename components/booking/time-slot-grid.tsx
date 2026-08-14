@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { SlotCell, type SlotStatus } from "@/components/booking/slot-cell";
-import type { AvailabilityMap } from "@/lib/booking/use-availability";
+import type { AvailabilityMap } from "@/lib/booking/use-court-slots";
 import { useBookingStore } from "@/lib/booking/store";
 import { getDaySlots, isSlotInPast, slotKey } from "@/lib/booking/slots";
 import { getSlotPrice } from "@/lib/booking/pricing";

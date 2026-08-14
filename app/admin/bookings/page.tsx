@@ -1,16 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { BookingDateNav } from "@/components/admin/bookings/booking-date-nav";
-import { AdminBookingsGrid } from "@/components/admin/bookings/admin-bookings-grid";
-import { getDayRangeUTC, isValidIsoDate, todayIsoDate } from "@/lib/date";
+import { AdminBookingsInteractive } from "@/components/admin/bookings/admin-bookings-interactive";
+import { getDayRangeUTC, todayIsoDate } from "@/lib/date";
 
-export default async function AdminBookingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ date?: string }>;
-}) {
-  const { date: dateParam } = await searchParams;
-  const date =
-    dateParam && isValidIsoDate(dateParam) ? dateParam : todayIsoDate();
+export default async function AdminBookingsPage() {
+  const date = todayIsoDate();
   const { startIso, endIso } = getDayRangeUTC(date);
 
   const supabase = await createClient();
@@ -50,12 +43,10 @@ export default async function AdminBookingsPage({
         </p>
       </div>
 
-      <BookingDateNav date={date} />
-
-      <AdminBookingsGrid
-        date={date}
+      <AdminBookingsInteractive
+        initialDate={date}
         courts={courts ?? []}
-        bookings={bookings ?? []}
+        initialBookings={bookings ?? []}
       />
     </div>
   );

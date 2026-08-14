@@ -1,7 +1,6 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import { BookingDateNav } from "@/components/booking/booking-date-nav";
 import { HorizontalDateStrip } from "@/components/booking/horizontal-date-strip";
 import { findBookableDateByMonth } from "@/lib/booking/find-bookable-date";
@@ -9,24 +8,18 @@ import { findBookableDateByMonth } from "@/lib/booking/find-bookable-date";
 export function BookingDateControls({
   date,
   courtIds,
+  onDateSelect,
 }: {
   date: string;
   courtIds: string[];
+  onDateSelect: (date: string) => void;
 }) {
-  const router = useRouter();
-  const [optimisticDate, setOptimisticDate] = useOptimistic(date);
-  const [isPending, startTransition] = useTransition();
   const [isFindingMonth, setIsFindingMonth] = useState(false);
   const [monthNavigationMessage, setMonthNavigationMessage] = useState("");
   const isFindingMonthRef = useRef(false);
 
   function selectDate(nextDate: string) {
-    if (nextDate === optimisticDate) return;
-
-    startTransition(() => {
-      setOptimisticDate(nextDate);
-      router.push(`/booking?date=${nextDate}`, { scroll: false });
-    });
+    if (nextDate !== date) onDateSelect(nextDate);
   }
 
   async function selectMonth(direction: -1 | 1) {
@@ -38,7 +31,7 @@ export function BookingDateControls({
 
     try {
       const nextDate = await findBookableDateByMonth({
-        date: optimisticDate,
+        date,
         direction,
         courtIds,
       });
@@ -64,14 +57,14 @@ export function BookingDateControls({
   return (
     <>
       <BookingDateNav
-        date={optimisticDate}
-        isPending={isPending || isFindingMonth}
+        date={date}
+        isPending={isFindingMonth}
         onDateSelect={selectDate}
         onMonthSelect={selectMonth}
       />
       <HorizontalDateStrip
-        date={optimisticDate}
-        isPending={isPending}
+        date={date}
+        isPending={false}
         onDateSelect={selectDate}
       />
       <span className="sr-only" aria-live="polite">

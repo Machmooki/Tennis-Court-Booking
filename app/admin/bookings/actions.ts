@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { getAdminUser } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -149,7 +148,6 @@ export async function createManualBooking(
     return { error: friendlyBookingError(bookingError) };
   }
 
-  revalidatePath("/admin/bookings");
   return {};
 }
 
@@ -198,7 +196,6 @@ export async function blockCourtSlot(
     return { error: friendlyBookingError(bookingError) };
   }
 
-  revalidatePath("/admin/bookings");
   return {};
 }
 
@@ -225,6 +222,5 @@ export async function cancelAdminBooking(
 
   if (error) return { error: error.message };
 
-  revalidatePath("/admin/bookings");
   return {};
 }

@@ -1,21 +1,22 @@
-"use client";
-
-import { useState } from "react";
 import { CourtSelector } from "@/components/booking/court-selector";
 import { TimeSlotGrid } from "@/components/booking/time-slot-grid";
-import { useAvailability } from "@/lib/booking/use-availability";
-import type { BookingStatus, CourtRow } from "@/types/database";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useCourtSlots } from "@/lib/booking/use-court-slots";
+import type { CourtRow } from "@/types/database";
+
+const SKELETON_SLOTS = 18;
 
 export function SlotGrid({
   date,
   courts,
-  initialAvailability,
+  selectedCourtId,
+  onCourtChange,
 }: {
   date: string;
   courts: CourtRow[];
-  initialAvailability?: Record<string, BookingStatus>;
+  selectedCourtId: string;
+  onCourtChange: (courtId: string) => void;
 }) {
-  const [selectedCourtId, setSelectedCourtId] = useState(courts[0]?.id ?? "");
   const selectedCourt =
     courts.find((court) => court.id === selectedCourtId) ?? courts[0];
 
@@ -36,15 +37,10 @@ export function SlotGrid({
       <CourtSelector
         courts={courts}
         selectedCourtId={selectedCourt.id}
-        onCourtChange={setSelectedCourtId}
+        onCourtChange={onCourtChange}
       />
 
-      <AvailabilityTimeSlots
-        key={date}
-        date={date}
-        court={selectedCourt}
-        initialAvailability={initialAvailability}
-      />
+      <AvailabilityTimeSlots date={date} court={selectedCourt} />
     </section>
   );
 }
@@ -52,16 +48,18 @@ export function SlotGrid({
 function AvailabilityTimeSlots({
   date,
   court,
-  initialAvailability,
 }: {
   date: string;
   court: CourtRow;
-  initialAvailability?: Record<string, BookingStatus>;
 }) {
-  const { availability, isLoading, isRealtimeConnected } = useAvailability(
-    date,
-    initialAvailability
-  );
+  const {
+    availability,
+    error,
+    isLoading,
+    isValidating,
+    isRealtimeConnected,
+  } = useCourtSlots(date, court.id);
+  const showSkeleton = isLoading || isValidating;
 
   return (
     <div className="mt-8">
@@ -73,7 +71,7 @@ function AvailabilityTimeSlots({
               isRealtimeConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
             }`}
           />
-          {isLoading
+          {showSkeleton
             ? "Loading…"
             : isRealtimeConnected
               ? "Live"
@@ -81,7 +79,32 @@ function AvailabilityTimeSlots({
         </div>
       </div>
 
-      <TimeSlotGrid date={date} court={court} availability={availability} />
+      {showSkeleton ? (
+        <TimeSlotGridSkeleton courtName={court.name} />
+      ) : error ? (
+        <div
+          className="rounded-3xl border border-dashed p-10 text-center text-sm text-destructive"
+          role="alert"
+        >
+          We couldn&apos;t load these time slots. Please try again.
+        </div>
+      ) : (
+        <TimeSlotGrid date={date} court={court} availability={availability} />
+      )}
+    </div>
+  );
+}
+
+function TimeSlotGridSkeleton({ courtName }: { courtName: string }) {
+  return (
+    <div
+      className="grid grid-cols-2 gap-3 min-[380px]:grid-cols-3 sm:grid-cols-4"
+      aria-label={`Loading ${courtName} available times`}
+      aria-busy="true"
+    >
+      {Array.from({ length: SKELETON_SLOTS }).map((_, index) => (
+        <Skeleton key={index} className="h-11 rounded-full" />
+      ))}
     </div>
   );
 }

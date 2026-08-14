@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /**
@@ -15,16 +15,31 @@ export function DashboardTabs({
   bookingHistory: ReactNode;
   walletHistory: ReactNode;
 }) {
+  const [activeTab, setActiveTab] = useState<"bookings" | "wallet">(
+    "bookings"
+  );
+
   return (
-    <Tabs defaultValue="bookings">
+    <Tabs
+      value={activeTab}
+      onValueChange={(value) => {
+        if (value === "bookings" || value === "wallet") {
+          setActiveTab(value);
+        }
+      }}
+    >
       <TabsList>
         <TabsTrigger value="bookings">Booking History</TabsTrigger>
         <TabsTrigger value="wallet">Wallet History</TabsTrigger>
       </TabsList>
-      <TabsContent value="bookings" className="mt-3">
+      <TabsContent
+        value="bookings"
+        keepMounted
+        className="mt-3 min-h-72"
+      >
         {bookingHistory}
       </TabsContent>
-      <TabsContent value="wallet" className="mt-3">
+      <TabsContent value="wallet" keepMounted className="mt-3 min-h-72">
         {walletHistory}
       </TabsContent>
     </Tabs>

@@ -1,18 +1,17 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { shiftIsoDate, todayIsoDate } from "@/lib/date";
 
-export function BookingDateNav({ date }: { date: string }) {
-  const router = useRouter();
-
-  function goToDate(nextDate: string) {
-    router.push(`/admin/bookings?date=${nextDate}`);
-  }
-
+export function BookingDateNav({
+  date,
+  onDateSelect,
+}: {
+  date: string;
+  onDateSelect: (date: string) => void;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <Button
@@ -20,7 +19,7 @@ export function BookingDateNav({ date }: { date: string }) {
         size="icon"
         className="h-11 w-11"
         aria-label="Previous day"
-        onClick={() => goToDate(shiftIsoDate(date, -1))}
+        onClick={() => onDateSelect(shiftIsoDate(date, -1))}
       >
         <ChevronLeft className="size-4" />
       </Button>
@@ -29,7 +28,7 @@ export function BookingDateNav({ date }: { date: string }) {
         type="date"
         value={date}
         onChange={(event) => {
-          if (event.target.value) goToDate(event.target.value);
+          if (event.target.value) onDateSelect(event.target.value);
         }}
         className="h-11 w-auto"
         aria-label="Selected date"
@@ -40,7 +39,7 @@ export function BookingDateNav({ date }: { date: string }) {
         size="icon"
         className="h-11 w-11"
         aria-label="Next day"
-        onClick={() => goToDate(shiftIsoDate(date, 1))}
+        onClick={() => onDateSelect(shiftIsoDate(date, 1))}
       >
         <ChevronRight className="size-4" />
       </Button>
@@ -48,7 +47,7 @@ export function BookingDateNav({ date }: { date: string }) {
       <Button
         variant="ghost"
         className="h-11"
-        onClick={() => goToDate(todayIsoDate())}
+        onClick={() => onDateSelect(todayIsoDate())}
       >
         Today
       </Button>
